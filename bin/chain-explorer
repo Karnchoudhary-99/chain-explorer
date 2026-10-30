@@ -1,0 +1,7 @@
+#!/usr/bin/env ruby
+# Explorer CLI entry point. Run with:
+#   ruby -Ilib bin/chain-explorer --chain sample-chain.json summary
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+require "chain_explorer/cli"
+
+exit ChainExplorer::CLI.new.run(ARGV)

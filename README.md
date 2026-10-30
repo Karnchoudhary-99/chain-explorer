@@ -9,7 +9,7 @@ you can build and inspect from the command line.
 - [x] Project scaffold (module layout, smoke test, CI, README)
 - [x] Block + transaction model
 - [x] Chain validation (hash links, proof-of-work difficulty)
-- [ ] Explorer CLI (blocks, transactions, addresses)
+- [x] Explorer CLI (blocks, transactions, addresses)
 - [ ] Self-review checklist, then public
 
 ## Quick start
@@ -17,6 +17,31 @@ you can build and inspect from the command line.
 ```sh
 ruby -Itest test/smoke_test.rb          # or: for f in test/*_test.rb; do ruby -Itest "$f"; done
 ruby -Ilib examples/build_sample.rb     # build a 2-block sample chain, print it, save sample-chain.json
+sh examples/explore.sh                 # same sample chain, toured through every CLI command
+```
+
+## Explorer CLI
+
+```sh
+ruby -Ilib bin/chain-explorer --chain sample-chain.json summary
+ruby -Ilib bin/chain-explorer --chain sample-chain.json validate
+ruby -Ilib bin/chain-explorer --chain sample-chain.json blocks
+ruby -Ilib bin/chain-explorer --chain sample-chain.json block 1
+ruby -Ilib bin/chain-explorer --chain sample-chain.json block 00f730bc…   # hash, or a unique prefix (≥ 8 chars)
+ruby -Ilib bin/chain-explorer --chain sample-chain.json tx bb0972abae74…  # id, or a unique prefix (≥ 8 chars)
+ruby -Ilib bin/chain-explorer --chain sample-chain.json address alice
+ruby -Ilib bin/chain-explorer --chain sample-chain.json address alice --limit 5  # most recent 5
+ruby -Ilib bin/chain-explorer --chain sample-chain.json blocks --from 1 --limit 10
+ruby -Ilib bin/chain-explorer --chain sample-chain.json top        # richest addresses
+ruby -Ilib bin/chain-explorer --chain sample-chain.json top 5
+ruby -Ilib bin/chain-explorer --chain sample-chain.json --json address bob  # every command takes --json
+```
+
+Exit codes: `0` on success, `1` when a block/transaction is not
+found or the chain fails validation, `2` for usage errors (missing
+`--chain`, missing argument, unknown command, too-short prefix).
+A chain file that cannot be parsed, or whose stored hashes do not
+match its contents, is rejected at load time with the reason.
 ```
 
 ## Model

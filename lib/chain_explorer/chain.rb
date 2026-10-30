@@ -1,5 +1,6 @@
 require "json"
 require_relative "block"
+require_relative "mempool"
 
 module ChainExplorer
   # An in-memory chain: a genesis block plus mined blocks on top.
@@ -28,6 +29,16 @@ module ChainExplorer
                         transactions: transactions, previous_hash: blocks.last.hash)
       block.mine!(difficulty)
       blocks << block
+      block
+    end
+
+    # Mines every pending transaction into one block and drains the pool.
+    def mine_pending(mempool, timestamp:)
+      raise ArgumentError, "mempool is empty" if mempool.empty?
+
+      transactions = mempool.to_a
+      block = add_block(transactions, timestamp: timestamp)
+      transactions.each { |tx| mempool.remove(tx.id) }
       block
     end
 

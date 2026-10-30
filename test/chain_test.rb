@@ -86,6 +86,19 @@ class ChainTest < Minitest::Test
     assert_equal c.blocks.last.hash, summary["latest_hash"]
   end
 
+  def test_mine_pending_drains_pool_into_block
+    c = chain
+    pool = ChainExplorer::Mempool.new
+    pool.add(tx("alice", "bob", 30, 5))
+    pool.add(tx("bob", "carol", 10, 6))
+    block = c.mine_pending(pool, timestamp: 10)
+    assert_equal 1, block.index
+    assert_equal [30, 10], block.transactions.map(&:amount)
+    assert pool.empty?
+    assert c.valid?
+    assert_raises(ArgumentError) { c.mine_pending(pool, timestamp: 20) }
+  end
+
   def test_save_and_load_round_trip
     c = chain
     c.add_block([tx("alice", "bob", 30)], timestamp: 10)

@@ -14,3 +14,4 @@ jobs:
             ruby -Itest "$f" || exit 1
           done
       - run: ruby -Ilib examples/build_sample.rb && rm -f sample-chain.json
+      - run: sh examples/explore.sh

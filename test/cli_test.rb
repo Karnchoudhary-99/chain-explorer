@@ -155,4 +155,41 @@ class CliTest < Minitest::Test
     assert_equal 50, parsed["amount"]
     assert_equal 1, parsed["block_index"]
   end
+
+  def test_blocks_pagination
+    _code, out, _err = run_cli("--chain", @path, "blocks", "--from", "1", "--limit", "1")
+    assert_includes out, "Block 1"
+    refute_includes out, "Block 0"
+  end
+
+  def test_blocks_unknown_option_is_usage_error
+    code, _out, err = run_cli("--chain", @path, "blocks", "--bogus")
+    assert_equal 2, code
+    assert_includes err, "unknown option"
+  end
+
+  def test_top_ranks_by_balance
+    code, out, _err = run_cli("--chain", @path, "top")
+    assert_equal 0, code
+    # bob nets +30, carol +20, alice -50
+    assert_match(/1\. bob/, out)
+    assert_match(/2\. carol/, out)
+    assert_match(/3\. alice/, out)
+  end
+
+  def test_top_limit_and_json
+    _code, out, _err = run_cli("--chain", @path, "top", "1")
+    assert_match(/1\. bob/, out)
+    refute_includes out, "carol"
+    _code, out, _err = run_cli("--chain", @path, "--json", "top", "2")
+    parsed = JSON.parse(out)
+    assert_equal %w[bob carol], parsed.map { |r| r["address"] }
+  end
+
+  def test_address_limit_shows_most_recent
+    _code, out, _err = run_cli("--chain", @path, "address", "bob", "--limit", "1")
+    assert_includes out, "sent 20"
+    refute_includes out, "received 50"
+    assert_includes out, "Balance: 30"
+  end
 end

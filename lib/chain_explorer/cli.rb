@@ -21,10 +21,13 @@ module ChainExplorer
       Commands:
         summary            chain height, transaction count, validity
         validate           report whether the chain is valid, with reasons
-        blocks             list every block (index, hash, tx count)
+        blocks [--from N] [--limit N]
+                         list blocks (index, hash, tx count)
         block INDEX|HASH   show one block (hash may be a unique prefix)
         tx ID              show one transaction (id may be a unique prefix)
-        address ADDRESS    balance plus every transaction for an address
+        address ADDRESS [--limit N]
+                         balance plus transactions for an address
+        top [N]            richest addresses by balance (default 10)
         help               show this help
     USAGE
 
@@ -55,10 +58,11 @@ module ChainExplorer
       case command
       when "summary" then emit(json, summary_data(chain), summary_text(chain))
       when "validate" then validate(chain, json)
-      when "blocks" then emit(json, blocks_data(chain), blocks_text(chain))
+      when "blocks" then blocks_command(chain, args, json)
       when "block" then block_command(chain, args, json)
       when "tx" then tx_command(chain, args, json)
       when "address" then address_command(chain, args, json)
+      when "top" then top_command(chain, args, json)
       else
         @err.puts "error: unknown command #{command.inspect}"
         @err.puts USAGE
@@ -155,15 +159,88 @@ module ChainExplorer
       end
     end
 
-    def blocks_data(chain)
-      chain.blocks.map(&:to_h)
+    def blocks_data(blocks)
+      blocks.map(&:to_h)
     end
 
-    def blocks_text(chain)
-      chain.blocks.map do |b|
+    def blocks_text(blocks)
+      blocks.map do |b|
         "Block #{b.index}  #{short(b.hash)}  prev #{short(b.previous_hash)}  " \
           "txs: #{b.transactions.length}  ts: #{b.timestamp}  nonce: #{b.nonce}"
       end.join("\n")
+    end
+
+    # Parses --from N / --limit N (also --from=N / --limit=N) from a
+    # command's trailing args; unknown flags are usage errors.
+    def parse_range(args)
+      from = 0
+      limit = nil
+      i = 0
+      while i < args.length
+        case args[i]
+        when "--from"
+          from = args[i + 1].to_i
+          i += 2
+        when /\A--from=(\d+)\z/
+          from = Regexp.last_match(1).to_i
+          i += 1
+        when "--limit"
+          limit = args[i + 1].to_i
+          i += 2
+        when /\A--limit=(\d+)\z/
+          limit = Regexp.last_match(1).to_i
+          i += 1
+        else
+          return nil
+        end
+      end
+      [from, limit]
+    end
+
+    def blocks_command(chain, args, json)
+      range = parse_range(args)
+      if range.nil?
+        @err.puts "error: unknown option for blocks (expected --from N / --limit N)"
+        return 2
+      end
+      from, limit = range
+      blocks = chain.blocks.drop(from)
+      blocks = blocks.first(limit) unless limit.nil?
+      emit(json, blocks_data(blocks), blocks_text(blocks))
+    end
+
+    def top_data(chain, limit)
+      addresses = chain.blocks.flat_map(&:transactions)
+                         .flat_map { |t| [t.sender, t.recipient] }.uniq
+      ranked = addresses.map do |a|
+        {"address" => a, "balance" => chain.balance(a),
+         "transactions" => chain.transactions_for(a).length}
+      end.sort_by { |r| [-r["balance"], r["address"]] }
+      ranked.first(limit)
+    end
+
+    def top_text(chain, limit)
+      top_data(chain, limit).each_with_index.map do |r, i|
+        "#{i + 1}. #{r['address']}  balance #{r['balance']}  txs: #{r['transactions']}"
+      end.join("\n")
+    end
+
+    def top_command(chain, args, json)
+      limit = 10
+      args.each do |a|
+        if a.match?(/\A--limit=(\d+)\z/)
+          limit = Regexp.last_match(1).to_i
+        elsif a == "--limit"
+          @err.puts "error: --limit requires a value (use --limit=N for top)"
+          return 2
+        elsif a.match?(/\A\d+\z/)
+          limit = a.to_i
+        else
+          @err.puts "error: unknown argument for top: #{a.inspect}"
+          return 2
+        end
+      end
+      emit(json, top_data(chain, limit), top_text(chain, limit))
     end
 
     def block_data(block)
@@ -274,12 +351,13 @@ module ChainExplorer
       end
     end
 
-    def address_data(chain, address)
+    def address_data(chain, address, limit = nil)
       txs = chain.transactions_for(address)
+      shown = limit.nil? ? txs : txs.last(limit)
       {
         "address" => address,
         "balance" => chain.balance(address),
-        "transactions" => txs.map do |t|
+        "transactions" => shown.map do |t|
           block, = chain.find_transaction(t.id)
           t.to_h.merge("block_index" => block.index,
                        "direction" => t.recipient == address ? "received" : "sent")
@@ -287,8 +365,8 @@ module ChainExplorer
       }
     end
 
-    def address_text(chain, address)
-      data = address_data(chain, address)
+    def address_text(chain, address, limit = nil)
+      data = address_data(chain, address, limit)
       lines = [
         "Address: #{address}",
         "Balance: #{data['balance']}",
@@ -307,7 +385,17 @@ module ChainExplorer
         return 2
       end
       address = args.first
-      emit(json, address_data(chain, address), address_text(chain, address))
+      if args[1..].any? { |a| a == "--from" || a.start_with?("--from=") }
+        @err.puts "error: unknown option for address (expected --limit N)"
+        return 2
+      end
+      range = parse_range(args[1..])
+      if range.nil?
+        @err.puts "error: unknown option for address (expected --limit N)"
+        return 2
+      end
+      _from, limit = range
+      emit(json, address_data(chain, address, limit), address_text(chain, address, limit))
     end
   end
 end

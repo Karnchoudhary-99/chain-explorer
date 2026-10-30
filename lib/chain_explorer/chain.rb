@@ -46,6 +46,7 @@ module ChainExplorer
         else
           found << "block #{i}: previous hash does not match block #{i - 1} hash" unless block.previous_hash == blocks[i - 1].hash
           found << "block #{i}: index must be #{i}" unless block.index == i
+          found << "block #{i}: timestamp goes backwards" if block.timestamp < blocks[i - 1].timestamp
         end
         block.transactions.each do |tx|
           found << "block #{i}: invalid transaction #{tx.id[0, 12]}" unless tx.valid?
@@ -80,6 +81,13 @@ module ChainExplorer
 
     def balance(address)
       transactions_for(address).sum { |tx| tx.recipient == address ? tx.amount : -tx.amount }
+    end
+
+    def summary
+      {"height" => height, "blocks" => blocks.length,
+       "transactions" => blocks.sum { |b| b.transactions.length },
+       "difficulty" => difficulty, "valid" => valid?,
+       "latest_hash" => blocks.last.hash}
     end
 
     def to_h

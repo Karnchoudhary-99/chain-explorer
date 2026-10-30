@@ -65,6 +65,27 @@ class ChainTest < Minitest::Test
     assert_equal 2, c.transactions_for("bob").length
   end
 
+  def test_backwards_timestamp_is_detected
+    c = chain
+    c.add_block([tx("alice", "bob", 30)], timestamp: 100)
+    bad = ChainExplorer::Block.new(index: 2, timestamp: 50, transactions: [],
+                                   previous_hash: c.blocks[1].hash).mine!(1)
+    c.blocks << bad
+    refute c.valid?
+    assert c.problems.any? { |p| p.include?("timestamp") }
+  end
+
+  def test_summary_reports_height_transactions_and_validity
+    c = chain
+    c.add_block([tx("alice", "bob", 30)], timestamp: 10)
+    summary = c.summary
+    assert_equal 1, summary["height"]
+    assert_equal 2, summary["blocks"]
+    assert_equal 1, summary["transactions"]
+    assert_equal true, summary["valid"]
+    assert_equal c.blocks.last.hash, summary["latest_hash"]
+  end
+
   def test_save_and_load_round_trip
     c = chain
     c.add_block([tx("alice", "bob", 30)], timestamp: 10)

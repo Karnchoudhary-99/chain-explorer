@@ -8,4 +8,9 @@ jobs:
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.3"
-      - run: ruby -Itest test/smoke_test.rb
+      - run: |
+          for f in test/*_test.rb; do
+            echo "== $f"
+            ruby -Itest "$f" || exit 1
+          done
+      - run: ruby -Ilib examples/build_sample.rb && rm -f sample-chain.json

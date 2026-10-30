@@ -10,7 +10,7 @@ you can build and inspect from the command line.
 - [x] Block + transaction model
 - [x] Chain validation (hash links, proof-of-work difficulty)
 - [x] Explorer CLI (blocks, transactions, addresses)
-- [ ] Self-review checklist, then public
+- [x] Self-review checklist, then public
 
 ## Quick start
 
